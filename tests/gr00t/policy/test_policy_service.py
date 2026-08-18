@@ -56,6 +56,9 @@ class MockPolicy:
             )
         }
 
+    def get_metadata(self):
+        return {"schema": "rmbench_gr00t_server_v1", "policy_kind": "vanilla"}
+
     def check_observation(self, observation):
         pass
 
@@ -126,6 +129,12 @@ class TestPolicyServerClient:
         assert "state" in config
         assert isinstance(config["state"], ModalityConfig)
         assert config["state"].modality_keys == ["joint_pos"]
+
+    def test_get_metadata(self, server_client):
+        client, _, _ = server_client
+        metadata = client.get_metadata()
+        assert metadata["schema"] == "rmbench_gr00t_server_v1"
+        assert metadata["policy_kind"] == "vanilla"
 
     def test_kill_server(self):
         """Test that kill_server stops the server loop."""
