@@ -219,6 +219,7 @@ class Gr00tN1d7Processor(BaseProcessor):
         modality_configs: dict[str, dict[str, ModalityConfig]],
         statistics: (dict[str, dict[str, dict[str, dict[str, list[float]]]]] | None) = None,
         use_percentiles: bool = False,
+        use_relative_action_percentiles: bool = False,
         clip_outliers: bool = True,
         image_crop_size: list[int] = None,
         image_target_size: list[int] = None,
@@ -252,6 +253,7 @@ class Gr00tN1d7Processor(BaseProcessor):
             modality_configs=modality_configs,
             statistics=statistics,
             use_percentiles=use_percentiles,
+            use_relative_action_percentiles=use_relative_action_percentiles,
             clip_outliers=clip_outliers,
             apply_sincos_state_encoding=apply_sincos_state_encoding,
             use_relative_action=use_relative_action,
@@ -259,6 +261,7 @@ class Gr00tN1d7Processor(BaseProcessor):
 
         # Save state action processor settings
         self.use_percentiles = use_percentiles
+        self.use_relative_action_percentiles = use_relative_action_percentiles
         self.use_mean_std = use_mean_std
         self.clip_outliers = clip_outliers
         self.apply_sincos_state_encoding = apply_sincos_state_encoding
@@ -781,6 +784,7 @@ class Gr00tN1d7Processor(BaseProcessor):
                 "max_action_horizon": self.max_action_horizon,
                 # StateActionProcessor settings
                 "use_percentiles": self.use_percentiles,
+                "use_relative_action_percentiles": self.use_relative_action_percentiles,
                 "use_mean_std": self.use_mean_std,
                 "clip_outliers": self.clip_outliers,
                 "apply_sincos_state_encoding": self.apply_sincos_state_encoding,
@@ -858,6 +862,7 @@ class Gr00tN1d7Processor(BaseProcessor):
         processor_kwargs.setdefault("model_name", "nvidia/Cosmos-Reason2-2B")
         processor_kwargs.setdefault("model_type", "qwen")
         processor_kwargs.setdefault("clip_outliers", True)
+        processor_kwargs.setdefault("use_relative_action_percentiles", False)
 
         # Directly override other processor kwargs
         if kwargs:
@@ -866,6 +871,8 @@ class Gr00tN1d7Processor(BaseProcessor):
             for embodiment_tag, modality_config in modality_configs.items():
                 processor_kwargs["modality_configs"][embodiment_tag] = modality_config
             override_keys = [
+                "use_percentiles",
+                "use_relative_action_percentiles",
                 "random_rotation_angle",
                 "color_jitter_params",
                 "use_relative_action",

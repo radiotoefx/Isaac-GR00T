@@ -21,6 +21,7 @@ This module provides the core policy classes for running Gr00t models:
 """
 
 import hashlib
+import json
 from pathlib import Path
 import secrets
 from typing import Any
@@ -72,6 +73,24 @@ def _sim_language_batch_to_sequence(value: Any) -> Any:
     if isinstance(value, str):
         return [value]
     return value
+
+
+def _sha256_file(path: str | Path | None) -> str | None:
+    if path is None:
+        return None
+    source = Path(path)
+    if not source.is_file():
+        return None
+    digest = hashlib.sha256()
+    with source.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(8 * 1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _canonical_json_sha256(value: Any) -> str:
+    payload = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 class Gr00tPolicy(BasePolicy):
@@ -292,6 +311,16 @@ class Gr00tPolicy(BasePolicy):
         )
         self.processor: BaseProcessor = AutoProcessor.from_pretrained(processor_dir)
         self.processor.eval()
+        statistics_path = self._metadata.get("statistics_path")
+        if statistics_path is not None:
+            with Path(statistics_path).open("r") as stream:
+                source_statistics = json.load(stream)
+            self._metadata["stats_source_content_sha256"] = _canonical_json_sha256(
+                source_statistics
+            )
+            self._metadata["stats_runtime_content_sha256"] = _canonical_json_sha256(
+                self.processor.state_action_processor.statistics
+            )
 
         # Store embodiment-specific configurations
         self.embodiment_tag = embodiment_tag
@@ -839,12 +868,33 @@ class Gr00tPolicy(BasePolicy):
             "ppu_id",
         )
         blockers = [f"missing:{key}" for key in required if metadata.get(key) is None]
+        for source, path_key, digest_key in (
+            ("checkpoint", "checkpoint_path", "checkpoint_sha256"),
+            ("processor", "processor_path", "processor_sha256"),
+            ("stats", "statistics_path", "stats_sha256"),
+        ):
+            current_digest = _sha256_file(metadata.get(path_key))
+            metadata[f"{source}_current_sha256"] = current_digest
+            if current_digest != metadata.get(digest_key):
+                blockers.append(f"{source}_source_changed_after_load")
+        if metadata.get("stats_source_content_sha256") != metadata.get(
+            "stats_runtime_content_sha256"
+        ):
+            blockers.append("stats_runtime_content_mismatch")
         if metadata.get("dirty") is not False:
             blockers.append("repo_not_clean")
         if metadata.get("policy_seed_explicit") is not True:
             blockers.append("policy_seed_not_explicit")
         if not self.checkpoint_load_report:
             blockers.append("checkpoint_load_report_empty")
+        for report in self.checkpoint_load_report:
+            scope = report.get("scope", "unknown")
+            if not report.get("loaded"):
+                blockers.append(f"checkpoint_loaded_keys_empty:{scope}")
+            if report.get("unexpected"):
+                blockers.append(f"checkpoint_unexpected_keys:{scope}")
+            if scope != "compact_delta" and report.get("missing"):
+                blockers.append(f"checkpoint_missing_keys:{scope}")
         if self.use_ttt and metadata.get("parent_checkpoint_sha256") is None:
             blockers.append("missing:parent_checkpoint_sha256")
         metadata["formal_blockers"] = sorted(blockers)
