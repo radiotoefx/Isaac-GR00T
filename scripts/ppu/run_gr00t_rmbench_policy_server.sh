@@ -37,8 +37,9 @@ ARGS=(
   --launch-manifest-path "$MANIFEST_PATH"
   --state-arm-semantics actual_qpos
   --state-gripper-semantics "$STATE_GRIPPER_SEMANTICS"
-  --arm-action-semantics relative
+  --arm-action-semantics absolute
   --gripper-action-semantics absolute
+  --relative-arm-to-absolute-boundary
   --strict
 )
 if [[ -n "$PROCESSOR_PATH" ]]; then
