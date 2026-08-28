@@ -28,7 +28,7 @@ from gr00t.data.embodiment_tags import EmbodimentTag
 from gr00t.data.types import ModalityConfig
 from gr00t.policy.gr00t_policy import Gr00tPolicy
 from gr00t.policy.replay_policy import ReplayPolicy
-from gr00t.policy.rmbench_adapter import RMBenchAbsoluteArmPolicyWrapper
+from gr00t.policy.rmbench_adapter import RMBenchDecodedActionPolicyWrapper
 from gr00t.policy.server_client import PolicyServer
 import torch
 import tyro
@@ -36,7 +36,7 @@ import tyro
 
 DEFAULT_MODEL_SERVER_PORT = 5555
 RMBENCH_SERVER_VERSION = "rmbench_gr00t_server_v1"
-RMBENCH_ADAPTER_VERSION = "gr00t_policy_adapter_v3"
+RMBENCH_ADAPTER_VERSION = "gr00t_policy_adapter_v4"
 
 
 def _sha256_file(path: Path | None) -> str | None:
@@ -127,7 +127,9 @@ def _build_server_metadata(config: "ServerConfig") -> dict[str, object]:
         "state_gripper_semantics": config.state_gripper_semantics,
         "arm_action_semantics": config.arm_action_semantics,
         "gripper_action_semantics": config.gripper_action_semantics,
-        "relative_arm_to_absolute_boundary": config.relative_arm_to_absolute_boundary,
+        "processor_decode_output_semantics": "absolute",
+        "boundary_conversion": "none",
+        "decoded_absolute_action_boundary": config.decoded_absolute_action_boundary,
         "memory_impl_version": "robottt_v1" if config.use_ttt else None,
         "ppu_id": config.ppu_id,
         "policy_seed_explicit": config.policy_seed is not None,
@@ -230,8 +232,8 @@ class ServerConfig:
     state_gripper_semantics: str = "physical"
     arm_action_semantics: str = "relative"
     gripper_action_semantics: str = "absolute"
-    relative_arm_to_absolute_boundary: bool = False
-    """Convert decoded relative joint_position actions using actual-qpos observations."""
+    decoded_absolute_action_boundary: bool = False
+    """Validate and expose processor-decoded absolute actions without conversion."""
 
     launch_manifest_path: str | None = None
     """Optional JSON path for the auditable process and model launch manifest."""
@@ -275,7 +277,7 @@ def main(config: ServerConfig):
                 else None
             ),
         )
-        if config.relative_arm_to_absolute_boundary:
+        if config.decoded_absolute_action_boundary:
             expected_semantics = {
                 "state_arm_semantics": (config.state_arm_semantics, "actual_qpos"),
                 "arm_action_semantics": (config.arm_action_semantics, "absolute"),
@@ -291,10 +293,10 @@ def main(config: ServerConfig):
             ]
             if mismatches:
                 raise ValueError(
-                    "RMBench relative-to-absolute boundary conversion requires "
+                    "RMBench decoded-absolute action boundary requires "
                     + ", ".join(mismatches)
                 )
-            policy = RMBenchAbsoluteArmPolicyWrapper(policy, strict=config.strict)
+            policy = RMBenchDecodedActionPolicyWrapper(policy, strict=config.strict)
     elif config.dataset_path is not None:
         if config.execution_horizon is None:
             raise ValueError(

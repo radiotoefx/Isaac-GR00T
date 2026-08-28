@@ -39,7 +39,7 @@ ARGS=(
   --state-gripper-semantics "$STATE_GRIPPER_SEMANTICS"
   --arm-action-semantics absolute
   --gripper-action-semantics absolute
-  --relative-arm-to-absolute-boundary
+  --decoded-absolute-action-boundary
   --strict
 )
 if [[ -n "$PROCESSOR_PATH" ]]; then

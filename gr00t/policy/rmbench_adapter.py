@@ -24,34 +24,34 @@ def _validate_current_actual_arm(current_actual_arm: np.ndarray) -> None:
         raise FloatingPointError("current actual arm state contains NaN or Inf")
 
 
-def relative_arm_to_absolute(
-    relative_arm: np.ndarray, current_actual_arm: np.ndarray
-) -> np.ndarray:
-    """Convert a relative arm horizon using one non-cumulative actual-qpos base."""
-    if not isinstance(relative_arm, np.ndarray):
-        raise TypeError(f"relative arm action must be an ndarray, got {type(relative_arm)}")
-    _validate_current_actual_arm(current_actual_arm)
-    if relative_arm.ndim != 3:
-        raise ValueError(f"relative arm action must have shape [B,H,D], got {relative_arm.shape}")
+def _validate_decoded_absolute_arm(
+    decoded_absolute_arm: np.ndarray, current_actual_arm: np.ndarray
+) -> None:
+    if not isinstance(decoded_absolute_arm, np.ndarray):
+        raise TypeError(
+            "processor decoded absolute arm action must be an ndarray, "
+            f"got {type(decoded_absolute_arm)}"
+        )
+    if decoded_absolute_arm.ndim != 3:
+        raise ValueError(
+            "processor decoded absolute arm action must have shape [B,H,D], "
+            f"got {decoded_absolute_arm.shape}"
+        )
     if (
-        relative_arm.shape[0] != current_actual_arm.shape[0]
-        or relative_arm.shape[2] != current_actual_arm.shape[2]
+        decoded_absolute_arm.shape[0] != current_actual_arm.shape[0]
+        or decoded_absolute_arm.shape[2] != current_actual_arm.shape[2]
     ):
         raise ValueError(
-            "relative arm action and current actual arm state must match in batch and "
-            f"dimension, got {relative_arm.shape} and {current_actual_arm.shape}"
+            "processor decoded arm action and current actual arm state must match "
+            f"in batch and dimension, got {decoded_absolute_arm.shape} and "
+            f"{current_actual_arm.shape}"
         )
-    if not np.isfinite(relative_arm).all():
-        raise FloatingPointError("relative arm action contains NaN or Inf")
-
-    absolute_arm = relative_arm + current_actual_arm
-    if not np.isfinite(absolute_arm).all():
-        raise FloatingPointError("absolute arm action contains NaN or Inf after conversion")
-    return absolute_arm
+    if not np.isfinite(decoded_absolute_arm).all():
+        raise FloatingPointError("processor decoded absolute arm action contains NaN or Inf")
 
 
-class RMBenchAbsoluteArmPolicyWrapper(PolicyWrapper):
-    """End GR00T relative-arm semantics at the PPU protocol boundary."""
+class RMBenchDecodedActionPolicyWrapper(PolicyWrapper):
+    """Validate and expose processor-decoded absolute actions without conversion."""
 
     _ARM_STATE_KEY = "joint_position"
     _ARM_ACTION_KEY = "joint_position"
@@ -75,27 +75,24 @@ class RMBenchAbsoluteArmPolicyWrapper(PolicyWrapper):
                 f"RMBench actual arm state must be 12D, got {current_actual_arm.shape}"
             )
 
-        raw_action, diagnostics = self.policy.get_action(observation, options)
-        if self._ARM_ACTION_KEY not in raw_action:
-            raise KeyError(f"model action is missing {self._ARM_ACTION_KEY!r}")
+        decoded_action, diagnostics = self.policy.get_action(observation, options)
+        if self._ARM_ACTION_KEY not in decoded_action:
+            raise KeyError(f"processor decoded action is missing {self._ARM_ACTION_KEY!r}")
 
-        relative_arm = raw_action[self._ARM_ACTION_KEY]
-        absolute_arm = relative_arm_to_absolute(relative_arm, current_actual_arm)
-        external_action = dict(raw_action)
-        external_action[self._ARM_ACTION_KEY] = absolute_arm
+        decoded_absolute_arm = decoded_action[self._ARM_ACTION_KEY]
+        _validate_decoded_absolute_arm(decoded_absolute_arm, current_actual_arm)
 
         diagnostics = dict(diagnostics or {})
         diagnostics["arm_boundary_adapter"] = {
             "state_source": f"observation.state.{self._ARM_STATE_KEY}",
-            "raw_model_semantics": "relative",
+            "processor_output_semantics": "absolute",
+            "boundary_conversion": "none",
             "external_semantics": "absolute",
-            "conversion_formula": "absolute[t+k]=actual[t]+relative[t+k]",
-            "cumulative_conversion": False,
             "current_actual_arm": current_actual_arm[:, 0, :].tolist(),
-            "raw_relative_arm_first": relative_arm[:, 0, :].tolist(),
-            "returned_absolute_arm_first": absolute_arm[:, 0, :].tolist(),
+            "processor_decoded_arm_first": decoded_absolute_arm[:, 0, :].tolist(),
+            "external_returned_arm_first": decoded_absolute_arm[:, 0, :].tolist(),
         }
-        return external_action, diagnostics
+        return decoded_action, diagnostics
 
     def check_observation(self, observation: dict[str, Any]) -> None:
         self.policy.check_observation(observation)

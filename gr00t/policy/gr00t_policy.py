@@ -883,16 +883,18 @@ class Gr00tPolicy(BasePolicy):
             blockers.append("stats_runtime_content_mismatch")
         if metadata.get("dirty") is not False:
             blockers.append("repo_not_clean")
-        if metadata.get("adapter_version") == "gr00t_policy_adapter_v3":
+        if metadata.get("adapter_version") == "gr00t_policy_adapter_v4":
             expected_adapter_semantics = {
                 "state_arm_semantics": "actual_qpos",
                 "state_gripper_semantics": "physical",
                 "arm_action_semantics": "absolute",
                 "gripper_action_semantics": "absolute",
-                "relative_arm_to_absolute_boundary": True,
+                "processor_decode_output_semantics": "absolute",
+                "boundary_conversion": "none",
+                "decoded_absolute_action_boundary": True,
             }
             blockers.extend(
-                f"adapter_v3_semantic_mismatch:{key}"
+                f"adapter_v4_semantic_mismatch:{key}"
                 for key, expected in expected_adapter_semantics.items()
                 if metadata.get(key) != expected
             )
