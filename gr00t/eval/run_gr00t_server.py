@@ -34,6 +34,8 @@ import tyro
 
 
 DEFAULT_MODEL_SERVER_PORT = 5555
+RMBENCH_SERVER_VERSION = "rmbench_gr00t_server_v1"
+RMBENCH_ADAPTER_VERSION = "gr00t_policy_adapter_v1"
 
 
 def _sha256_file(path: Path | None) -> str | None:
@@ -70,6 +72,12 @@ def _repo_identity(repo: Path) -> tuple[str | None, bool | None]:
 def _build_server_metadata(config: "ServerConfig") -> dict[str, object]:
     repo = Path(__file__).resolve().parents[2]
     commit, dirty = _repo_identity(repo)
+    try:
+        process_start_time = subprocess.check_output(
+            ["ps", "-p", str(os.getpid()), "-o", "lstart="], text=True
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        process_start_time = datetime.now(timezone.utc).isoformat()
     model_dir = Path(config.model_path).resolve() if config.model_path else None
     processor_dir = (
         Path(config.processor_path).resolve()
@@ -94,6 +102,12 @@ def _build_server_metadata(config: "ServerConfig") -> dict[str, object]:
         else None
     )
     return {
+        "server_version": RMBENCH_SERVER_VERSION,
+        "adapter_version": RMBENCH_ADAPTER_VERSION,
+        "process_start_time": process_start_time,
+        "server_host": config.host,
+        "server_port": config.port,
+        "policy_type": "robottt" if config.use_ttt else "vanilla",
         "repo_commit": commit,
         "dirty": dirty,
         "checkpoint_path": None if checkpoint_file is None else str(checkpoint_file),
@@ -102,6 +116,9 @@ def _build_server_metadata(config: "ServerConfig") -> dict[str, object]:
         "processor_sha256": _sha256_file(processor_file),
         "statistics_path": None if statistics_file is None else str(statistics_file),
         "statistics_sha256": _sha256_file(statistics_file),
+        # Contract alias: stats_sha256 is the digest of the exact statistics
+        # file loaded by AutoProcessor.from_pretrained below.
+        "stats_sha256": _sha256_file(statistics_file),
         "modality_config_path": None if modality_file is None else str(modality_file),
         "modality_config_sha256": _sha256_file(modality_file),
         "parent_checkpoint_sha256": config.parent_checkpoint_sha256,

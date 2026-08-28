@@ -185,6 +185,11 @@ class PolicyServer:
             getattr(self.policy, "get_metadata", lambda: {}),
             requires_input=False,
         )
+        self.register_endpoint(
+            "get_identity",
+            getattr(self.policy, "get_metadata", lambda: {}),
+            requires_input=False,
+        )
 
     def _kill_server(self):
         """Stop the run loop. Does not release the socket / context — use ``close()``."""
@@ -405,6 +410,9 @@ class PolicyClient(BasePolicy):
 
     def get_metadata(self) -> dict[str, Any]:
         return self.call_endpoint("get_metadata", requires_input=False)
+
+    def get_identity(self) -> dict[str, Any]:
+        return self.call_endpoint("get_identity", requires_input=False)
 
     def check_observation(self, observation: dict[str, Any]) -> None:
         raise NotImplementedError(

@@ -815,6 +815,7 @@ class Gr00tPolicy(BasePolicy):
             {
                 "schema": "rmbench_gr00t_server_v1",
                 "policy_kind": "robottt" if self.use_ttt else "vanilla",
+                "policy_type": "robottt" if self.use_ttt else "vanilla",
                 "noise_mode": self.noise_mode,
                 "memory_enabled": self.use_ttt,
                 "memory_impl_version": "robottt_v1" if self.use_ttt else None,
@@ -823,9 +824,12 @@ class Gr00tPolicy(BasePolicy):
             }
         )
         required = (
+            "policy_type",
+            "adapter_version",
             "repo_commit",
             "checkpoint_sha256",
             "processor_sha256",
+            "stats_sha256",
             "statistics_sha256",
             "modality_config_sha256",
             "state_arm_semantics",
