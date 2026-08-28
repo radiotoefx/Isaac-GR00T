@@ -61,7 +61,7 @@ class _RelativePolicy:
 
     def get_metadata(self):
         return {
-            "adapter_version": "gr00t_policy_adapter_v2",
+            "adapter_version": "gr00t_policy_adapter_v3",
             "arm_action_semantics": "absolute",
             "gripper_action_semantics": "absolute",
         }
@@ -160,9 +160,10 @@ def test_converted_response_is_idempotent_on_wire():
         assert first[1][field] == options[field]
 
 
-def test_adapter_v2_identity_declares_absolute_external_actions():
+def test_adapter_v3_identity_declares_external_state_and_action_semantics():
     config = ServerConfig(
         state_arm_semantics="actual_qpos",
+        state_gripper_semantics="physical",
         arm_action_semantics="absolute",
         gripper_action_semantics="absolute",
         relative_arm_to_absolute_boundary=True,
@@ -170,9 +171,10 @@ def test_adapter_v2_identity_declares_absolute_external_actions():
 
     metadata = _build_server_metadata(config)
 
-    assert RMBENCH_ADAPTER_VERSION == "gr00t_policy_adapter_v2"
-    assert metadata["adapter_version"] == "gr00t_policy_adapter_v2"
+    assert RMBENCH_ADAPTER_VERSION == "gr00t_policy_adapter_v3"
+    assert metadata["adapter_version"] == "gr00t_policy_adapter_v3"
     assert metadata["state_arm_semantics"] == "actual_qpos"
+    assert metadata["state_gripper_semantics"] == "physical"
     assert metadata["arm_action_semantics"] == "absolute"
     assert metadata["gripper_action_semantics"] == "absolute"
     assert metadata["relative_arm_to_absolute_boundary"] is True

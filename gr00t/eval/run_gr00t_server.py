@@ -36,7 +36,7 @@ import tyro
 
 DEFAULT_MODEL_SERVER_PORT = 5555
 RMBENCH_SERVER_VERSION = "rmbench_gr00t_server_v1"
-RMBENCH_ADAPTER_VERSION = "gr00t_policy_adapter_v2"
+RMBENCH_ADAPTER_VERSION = "gr00t_policy_adapter_v3"
 
 
 def _sha256_file(path: Path | None) -> str | None:
@@ -227,7 +227,7 @@ class ServerConfig:
     """Immutable parent checkpoint identity for a RoboTTT candidate."""
 
     state_arm_semantics: str = "actual_qpos"
-    state_gripper_semantics: str = "commanded"
+    state_gripper_semantics: str = "physical"
     arm_action_semantics: str = "relative"
     gripper_action_semantics: str = "absolute"
     relative_arm_to_absolute_boundary: bool = False
